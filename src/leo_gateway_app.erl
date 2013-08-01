@@ -206,6 +206,8 @@ after_process_1(SystemConf, Members) ->
                           ]),
     ok = leo_membership:set_proc_auditor(leo_gateway_api),
 
+    application:start(leo_rpc),
+
     %% Register in THIS-Process
     ok = leo_gateway_api:register_in_monitor(first),
     lists:foldl(fun(N, false) ->
