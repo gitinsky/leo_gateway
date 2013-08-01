@@ -177,10 +177,10 @@ invoke([], _Mod, _Method, _Args, Errors) ->
 invoke([{_, false}|T], Mod, Method, Args, Errors) ->
     invoke(T, Mod, Method, Args, [?ERR_TYPE_INTERNAL_ERROR|Errors]);
 invoke([{Node, true}|T], Mod, Method, Args, Errors) ->
-    RPCKey  = rpc:async_call(Node, Mod, Method, Args),
+    RPCKey  = leo_rpc:async_call(Node, Mod, Method, Args),
     Timeout = timeout(Method, Args),
 
-    case rpc:nb_yield(RPCKey, Timeout) of
+    case leo_rpc:nb_yield(RPCKey, Timeout) of
         %% delete
         {value, ok = Ret} ->
             Ret;
