@@ -121,6 +121,7 @@ start(_Type, _StartArgs) ->
     %%     _ ->
     %%         void
     %% end,
+    application:start(leo_rpc),
 
     %% Launch Supervisor
     Res = leo_gateway_sup:start_link(),
