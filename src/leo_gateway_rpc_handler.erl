@@ -185,25 +185,23 @@ invoke([#redundant_node{available = false}|T], Mod, Method, Args, Errors) ->
     invoke(T, Mod, Method, Args, [?ERR_TYPE_INTERNAL_ERROR|Errors]);
 invoke([#redundant_node{node      = Node,
                         available = true}|T], Mod, Method, Args, Errors) ->
-    RPCKey  = leo_rpc:async_call(Node, Mod, Method, Args),
     Timeout = timeout(Method, Args),
-
-    case leo_rpc:nb_yield(RPCKey, Timeout) of
+    case leo_rpc:call(Node, Mod, Method, Args, Timeout) of
         %% delete
-        {value, ok = Ret} ->
-            Ret;
+        ok ->
+            ok;
         %% put
-        {value, {ok, {etag, ETag}}} ->
+        {ok, {etag, ETag}} ->
             {ok, ETag};
         %% get-1
-        {value, {ok, _Meta, _Bin} = Ret} ->
-            Ret;
+        {ok, Meta, Bin} ->
+            {ok, Meta, Bin};
         %% get-2
-        {value, {ok, match} = Ret} ->
-            Ret;
+        {ok, match} ->
+            {ok, match};
         %% head
-        {value, {ok, _Meta} = Ret} ->
-            Ret;
+        {ok, Meta} ->
+            {ok, Meta};
         %% error
         {value, {error,_Cause} = Ret} ->
             Ret;
@@ -247,21 +245,20 @@ error_filter([_H|T],                Prev) -> error_filter(T, Prev).
 
 %% @doc Handle an error response
 %%
-handle_error(_Node, _Mod, _Method, _Args, {value, {error, not_found = Error}}) ->
+handle_error(_Node, _Mod, _Method, _Args, {error, not_found = Error}) ->
     Error;
-handle_error(Node, Mod, Method, _Args, {value, {error, Cause}}) ->
+handle_error(Node, Mod, Method, _Args, {error, Cause}) ->
     ?warn("handle_error/5", "node:~w, mod:~w, method:~w, cause:~p",
           [Node, Mod, Method, Cause]),
     ?ERR_TYPE_INTERNAL_ERROR;
-handle_error(Node, Mod, Method, _Args, {value, {badrpc, Cause}}) ->
+handle_error(Node, Mod, Method, _Args, {badrpc, timeout}) ->
+    ?warn("handle_error/5", "node:~w, mod:~w, method:~w, cause:~p",
+          [Node, Mod, Method, timeout]),
+    timeout;
+handle_error(Node, Mod, Method, _Args, {badrpc, Cause}) ->
     ?warn("handle_error/5", "node:~w, mod:~w, method:~w, cause:~p",
           [Node, Mod, Method, Cause]),
-    ?ERR_TYPE_INTERNAL_ERROR;
-handle_error(Node, Mod, Method, _Args, timeout = Error) ->
-    ?warn("handle_error/5", "node:~w, mod:~w, method:~w, cause:~p",
-          [Node, Mod, Method, Error]),
-    Error.
-
+    ?ERR_TYPE_INTERNAL_ERROR.
 
 %% @doc Timeout depends on length of an object
 %%
