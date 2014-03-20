@@ -627,7 +627,7 @@ handle_multi_upload_3(Total, Total, _, Acc, MD5Context) ->
     {ok, {Len, ETag2, crypto:hash_final(MD5Context)}};
 
 handle_multi_upload_3(PartNum, Total, Path, Acc, MD5Context) ->
-    PartNumBin = list_to_binary(integer_to_list(PartNum)),
+    PartNumBin = list_to_binary(integer_to_list(PartNum + 1)),
     Key = << Path/binary, ?STR_NEWLINE, PartNumBin/binary  >>,
 
     case leo_gateway_rpc_handler:head_with_calc_md5(Key, MD5Context) of
@@ -649,7 +649,7 @@ handle_multi_upload_3(PartNum, Total, Path, Acc, MD5Context) ->
 calc_md5_grandchild(_Path, Total, Total, MD5Context) ->
     MD5Context;
 calc_md5_grandchild(Path, PartNum, Total, MD5Context) ->
-    PartNumBin = list_to_binary(integer_to_list(PartNum)),
+    PartNumBin = list_to_binary(integer_to_list(PartNum + 1)),
     Key = << Path/binary, ?STR_NEWLINE, PartNumBin/binary  >>,
     case leo_gateway_rpc_handler:head_with_calc_md5(Key, MD5Context) of
         {ok, _, NewMD5Context} ->
