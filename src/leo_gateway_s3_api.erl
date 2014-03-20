@@ -624,7 +624,7 @@ handle_multi_upload_3(Total, Total, _, Acc, MD5Context) ->
                              {Sum + DSize, <<ETagBin1/binary, ETagBin2/binary>>}
                      end, {0, <<>>}, lists:reverse(Acc)),
     ETag2 = leo_hex:hex_to_integer(leo_hex:binary_to_hex(crypto:hash(md5, ETag1))),
-    {ok, {Len, ETag2, crypto:hash_final(MD5Context)}};
+    {ok, {Len, ETag2, leo_hex:hex_to_integer(leo_hex:binary_to_hex(crypto:hash_final(MD5Context)))}};
 
 handle_multi_upload_3(PartNum, Total, Path, Acc, MD5Context) ->
     PartNumBin = list_to_binary(integer_to_list(PartNum + 1)),
