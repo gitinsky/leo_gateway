@@ -622,7 +622,7 @@ handle_multi_upload_3(Total, Total, _, Acc, MD5Context) ->
                      fun({_, {DSize, Checksum}}, {Sum, ETagBin1}) ->
                              ETagBin2 = leo_hex:integer_to_raw_binary(Checksum),
                              {Sum + DSize, <<ETagBin1/binary, ETagBin2/binary>>}
-                     end, {0, <<>>}, Acc),
+                     end, {0, <<>>}, lists:reverse(Acc)),
     ETag2 = leo_hex:hex_to_integer(leo_hex:binary_to_hex(crypto:hash(md5, ETag1))),
     {ok, {Len, ETag2, crypto:hash_final(MD5Context)}};
 
