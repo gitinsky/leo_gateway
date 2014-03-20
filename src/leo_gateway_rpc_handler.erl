@@ -29,6 +29,7 @@
 -author('Yoshiyuki Kanno').
 
 -export([head/1,
+         head_with_calc_md5/2,
          get/1,
          get/2,
          get/3,
@@ -67,6 +68,19 @@ head(Key) ->
            leo_storage_handler_object,
            head,
            [ReqParams#req_params.addr_id, Key],
+           []).
+
+%% @doc Retrieve a metada/data from backend_db/object-storage
+%%      AND calc MD5 based on the body data
+%%
+-spec(head_with_calc_md5(binary(), any()) ->
+             {ok, #?METADATA{}, any()}|{error, any()}).
+head_with_calc_md5(Key, MD5Context) ->
+    ReqParams = get_request_parameters(head, Key),
+    invoke(ReqParams#req_params.redundancies,
+           leo_storage_handler_object,
+           head_with_calc_md5,
+           [ReqParams#req_params.addr_id, Key, MD5Context],
            []).
 
 %% @doc Retrieve an object from the storage-cluster

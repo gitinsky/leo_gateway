@@ -50,7 +50,7 @@
 -include_lib("xmerl/include/xmerl.hrl").
 
 -compile({inline, [handle/2, handle_1/4, handle_2/6,
-                   handle_multi_upload_1/5, handle_multi_upload_2/4, handle_multi_upload_3/3,
+                   handle_multi_upload_1/5, handle_multi_upload_2/4, handle_multi_upload_3/5,
                    gen_upload_key/1, gen_upload_initiate_xml/3, gen_upload_completion_xml/4,
                    resp_copy_obj_xml/2, request_params/2, auth/5, auth/7, auth/8,
                    get_bucket_1/6, put_bucket_1/3, delete_bucket_1/2, head_bucket_1/2
@@ -592,9 +592,9 @@ handle_multi_upload_2({ok, Bin, Req}, _Req, Path1, CL) ->
                                            [{space,normalize}, {acc_fun, Acc}]),
     TotalUploadedObjs = length(Content),
 
-    case handle_multi_upload_3(TotalUploadedObjs, Path1, []) of
-        {ok, {Len, ETag1}} ->
-            case leo_gateway_rpc_handler:put(Path1, <<>>, Len, CL, TotalUploadedObjs, ETag1) of
+    case handle_multi_upload_3(0, TotalUploadedObjs, Path1, [], crypto:hash_init(md5)) of
+        {ok, {Len, ETag1, ETag4WholeObject}} ->
+            case leo_gateway_rpc_handler:put(Path1, <<>>, Len, CL, TotalUploadedObjs, ETag4WholeObject) of
                 {ok, _} ->
                     [Bucket|Path2] = leo_misc:binary_tokens(Path1, ?BIN_SLASH),
                     ETag2 = leo_hex:integer_to_hex(ETag1, 32),
@@ -615,26 +615,45 @@ handle_multi_upload_2({error, Cause}, Req, Path, _CL) ->
 
 %% @doc Retrieve Metadatas for uploaded objects (Multipart)
 %% @private
--spec(handle_multi_upload_3(integer(), binary(), list(tuple())) ->
+-spec(handle_multi_upload_3(integer(), integer(), binary(), list(tuple()), any()) ->
              {ok, tuple()} | {error, any()}).
-handle_multi_upload_3(0, _, Acc) ->
-    Metas = lists:reverse(Acc),
+handle_multi_upload_3(Total, Total, _, Acc, MD5Context) ->
     {Len, ETag1} = lists:foldl(
                      fun({_, {DSize, Checksum}}, {Sum, ETagBin1}) ->
                              ETagBin2 = leo_hex:integer_to_raw_binary(Checksum),
                              {Sum + DSize, <<ETagBin1/binary, ETagBin2/binary>>}
-                     end, {0, <<>>}, lists:sort(Metas)),
+                     end, {0, <<>>}, Acc),
     ETag2 = leo_hex:hex_to_integer(leo_hex:binary_to_hex(crypto:hash(md5, ETag1))),
-    {ok, {Len, ETag2}};
+    {ok, {Len, ETag2, crypto:hash_final(MD5Context)}};
 
-handle_multi_upload_3(PartNum, Path, Acc) ->
+handle_multi_upload_3(PartNum, Total, Path, Acc, MD5Context) ->
     PartNumBin = list_to_binary(integer_to_list(PartNum)),
     Key = << Path/binary, ?STR_NEWLINE, PartNumBin/binary  >>,
 
-    case leo_gateway_rpc_handler:head(Key) of
-        {ok, #?METADATA{dsize = Len,
-                        checksum = Checksum}} ->
-            handle_multi_upload_3(PartNum - 1, Path, [{PartNum, {Len, Checksum}} | Acc]);
+    case leo_gateway_rpc_handler:head_with_calc_md5(Key, MD5Context) of
+        {ok, #?METADATA{dsize    = Len,
+                        cnumber  = 0,
+                        checksum = Checksum}, NewMD5Context} ->
+            handle_multi_upload_3(PartNum + 1, Total, Path, [{PartNum, {Len, Checksum}} | Acc], NewMD5Context);
+        {ok, #?METADATA{dsize    = Len,
+                        cnumber  = ChunkNum,
+                        checksum = Checksum}, _} ->
+            NewMD5Context = calc_md5_grandchild(Key, 0, ChunkNum, MD5Context),
+            handle_multi_upload_3(PartNum + 1, Total, Path, [{PartNum, {Len, Checksum}} | Acc], NewMD5Context);
+        Error ->
+            Error
+    end.
+
+%% @doc Calculating grand child's MD5
+%% @private
+calc_md5_grandchild(_Path, Total, Total, MD5Context) ->
+    MD5Context;
+calc_md5_grandchild(Path, PartNum, Total, MD5Context) ->
+    PartNumBin = list_to_binary(integer_to_list(PartNum)),
+    Key = << Path/binary, ?STR_NEWLINE, PartNumBin/binary  >>,
+    case leo_gateway_rpc_handler:head_with_calc_md5(Key, MD5Context) of
+        {ok, _, NewMD5Context} ->
+            calc_md5_grandchild(Path, PartNum + 1, Total, NewMD5Context);
         Error ->
             Error
     end.
