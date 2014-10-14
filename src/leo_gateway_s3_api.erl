@@ -281,7 +281,7 @@ put_object(?BIN_EMPTY, Req, Key, Params) ->
 %% @doc POST/PUT operation on Objects. COPY/REPLACE
 %% @private
 put_object(Directive, Req, Key, #req_params{handler = ?PROTO_HANDLER_S3} = Params) ->
-    CS = cowboy_http:urldecode(?http_header(Req, ?HTTP_HEAD_X_AMZ_COPY_SOURCE)),
+    CS = cow_qs:urldecode(?http_header(Req, ?HTTP_HEAD_X_AMZ_COPY_SOURCE)),
 
     %% need to trim head '/' when cooperating with s3fs(-c)
     CS2 = case binary:part(CS, {0, 1}) of
@@ -402,13 +402,13 @@ get_bucket_and_path(Req) ->
                   end,
     {Host,    _} = cowboy_req:host(Req),
     {RawPath, _} = cowboy_req:path(Req),
-    Path = cowboy_http:urldecode(RawPath),
+    Path = cow_qs:urldecode(RawPath),
     leo_http:key(EndPoints_2, Host, Path).
 
 
 %% @doc Handle an http-request
 %% @private
-handle_1(Req, [{NumOfMinLayers, NumOfMaxLayers}, HasInnerCache, Props] = State, Bucket, Path) ->
+handle_1(Req, [{NumOfMinLayers, NumOfMaxLayers}, HasInnerCache, CustomHeaderSettings, Props] = State, Bucket, Path) ->
     BinPart    = binary:part(Path, {byte_size(Path)-1, 1}),
     TokenLen   = length(binary:split(Path, [?BIN_SLASH], [global, trim])),
     HTTPMethod = cowboy_req:get(method, Req),
@@ -446,6 +446,7 @@ handle_1(Req, [{NumOfMinLayers, NumOfMaxLayers}, HasInnerCache, Props] = State, 
                              max_chunked_objs  = Props#http_options.max_chunked_objs,
                              max_len_of_obj    = Props#http_options.max_len_of_obj,
                              chunked_obj_len   = Props#http_options.chunked_obj_len,
+                             custom_header_settings = CustomHeaderSettings,
                              reading_chunked_obj_len = Props#http_options.reading_chunked_obj_len,
                              threshold_of_chunk_len  = Props#http_options.threshold_of_chunk_len}),
     AuthRet = auth(Req_2, HTTPMethod, Path_1, TokenLen, ReqParams),

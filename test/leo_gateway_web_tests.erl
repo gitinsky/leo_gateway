@@ -177,6 +177,10 @@ setup(InitFun, TermFun) ->
                 {ok, [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER,
                                        permissions = [read, write]}]}),
 
+    Date = list_to_binary(leo_http:rfc1123_date(leo_date:now())),
+    meck:new(cowboy_clock, [non_strict]),
+    meck:expect(cowboy_clock, rfc1123, 0, Date),
+
     meck:new(leo_metrics_req, [non_strict]),
     meck:expect(leo_metrics_req, notify, fun(_) -> ok end),
     ok = rpc:call(Node1, meck, new,    [leo_metrics_req, [no_link, non_strict]]),
@@ -241,6 +245,8 @@ get_bucket_list_error_([_TermFun, _Node0, Node1]) ->
                           [leo_storage_handler_directory,
                            find_by_parent_dir, 1, {error, some_error}]),
             try
+                D = cowboy_clock:rfc1123(),
+                io:format(user, "[debug] date:~p~n",[D]),
                 {ok, {SC, Body}} =
                     httpc:request(get, {lists:append(
                                           ["http://", ?TARGET_HOST, ":8080/a/b?prefix=pre"]), []},
@@ -271,6 +277,8 @@ get_bucket_list_empty_([_TermFun, _Node0, Node1]) ->
                           [leo_storage_handler_directory, find_by_parent_dir, 4, {ok, []}]),
 
             try
+                D = cowboy_clock:rfc1123(),
+                io:format(user, "[debug] date:~p~n",[D]),
                 {ok, {SC, Body}} =
                     httpc:request(get, {lists:append(["http://",
                                                       ?TARGET_HOST,
